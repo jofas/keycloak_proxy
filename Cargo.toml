@@ -1,0 +1,20 @@
+[package]
+name = "keycloak_proxy"
+version = "0.1.0"
+authors = ["jofas <jonas@fc-web.de>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix-web = "*"
+actix-cors = "*"
+actix-rt = "*"
+actix-web-httpauth="*"
+serde = "*"
+serde_derive = "*"
+serde_json = "*"
+serde_qs = "*"
+futures = "*"
+lazy_static = "*"
+tokio = { version = "0.3.5", features = ["sync"] }
