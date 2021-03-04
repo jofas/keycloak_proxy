@@ -1,4 +1,4 @@
-FROM rust:1.45.2 AS build
+FROM rustlang/rust:nightly AS build
 COPY . .
 RUN echo $KEYCLOAK_PROXY_PORT
 RUN cargo build --release

@@ -114,7 +114,7 @@ dependencies = [
 [[package]]
 name = "actix-oidc-token"
 version = "0.1.0"
-source = "git+https://github.com/jofas/actix_oidc_token#c4f521eace6eb12be628f71be7b309ccf5806885"
+source = "git+https://github.com/jofas/actix_oidc_token#2ee89abb028185a9654a326dafd6d138c24ae6d2"
 dependencies = [
  "actix-web",
  "actix-web-httpauth",
