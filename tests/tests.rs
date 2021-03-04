@@ -12,7 +12,7 @@ use keycloak_proxy::{app_config, init_admin_token};
 async fn password_request() {
   let admin_token = init_admin_token().await;
   let mut app = test::init_service(
-    App::new().configure(app_config).data(admin_token)
+    App::new().configure(app_config).data(admin_token),
   )
   .await;
 
@@ -30,8 +30,9 @@ async fn password_request() {
 
   assert!(resp.status().is_success());
 
-  let bytes =
-    test::load_stream(resp.take_body().into_stream()).await.unwrap();
+  let bytes = test::load_stream(resp.take_body().into_stream())
+    .await
+    .unwrap();
 
   let _token_response: TokenResponse =
     serde_json::from_slice(&bytes).unwrap();

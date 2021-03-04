@@ -1,21 +1,20 @@
-use actix_web::{get, post, web, HttpResponse,
-  HttpRequest};
 use actix_web::client::{Client, SendRequestError};
+use actix_web::{get, post, web, HttpRequest, HttpResponse};
 
 use actix_oidc_token::{AccessToken, TokenRequest};
 
 use actix_proxy::IntoHttpResponse;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 use lazy_static::lazy_static;
 
 use std::env;
 
 // TODO: into Env struct
-lazy_static!{
-  static ref CLIENT_ID: String = env::var("KEYCLOAK_PROXY_CLIENT_ID")
-    .unwrap();
+lazy_static! {
+  static ref CLIENT_ID: String =
+    env::var("KEYCLOAK_PROXY_CLIENT_ID").unwrap();
   static ref ADMIN_CLI_SECRET: String =
     env::var("KEYCLOAK_PROXY_ADMIN_CLI_SECRET").unwrap();
   static ref CERTS_ENDPOINT: String = format!(
@@ -55,10 +54,9 @@ pub async fn init_admin_token() -> AccessToken {
     ADMIN_CLI_SECRET.clone(),
   );
 
-  AccessToken::new(
-    ADMIN_TOKEN_ENDPOINT.clone(),
-    admin_token_request,
-  ).periodically_refresh().await
+  AccessToken::new(ADMIN_TOKEN_ENDPOINT.clone(), admin_token_request)
+    .periodically_refresh()
+    .await
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -80,12 +78,10 @@ impl From<ProxyRegisterRequest> for RegisterRequest {
       email: proxy.email,
       enabled: true,
       username: proxy.username,
-      credentials: vec![
-        Credentials {
-          r#type: String::from("password"),
-          value: proxy.password,
-        }
-      ],
+      credentials: vec![Credentials {
+        r#type: String::from("password"),
+        value: proxy.password,
+      }],
     }
   }
 }
@@ -109,17 +105,21 @@ struct ProxyRegisterRequest {
 async fn token(
   request: HttpRequest,
   body: web::Form<TokenRequest>,
-  client: web::Data<Client>) -> Result<HttpResponse, SendRequestError>
-{
-  client.request_from(&*TOKEN_ENDPOINT, request.head())
+  client: web::Data<Client>,
+) -> Result<HttpResponse, SendRequestError> {
+  client
+    .request_from(&*TOKEN_ENDPOINT, request.head())
     .send_form(&body.into_inner().add_client_id(CLIENT_ID.clone()))
     .await?
     .into_wrapped_http_response()
 }
 
 #[get("/certs")]
-async fn certs(client: web::Data<Client>) -> Result<HttpResponse, SendRequestError> {
-  client.get(&*CERTS_ENDPOINT)
+async fn certs(
+  client: web::Data<Client>,
+) -> Result<HttpResponse, SendRequestError> {
+  client
+    .get(&*CERTS_ENDPOINT)
     .send()
     .await?
     .into_wrapped_http_response()
@@ -136,7 +136,8 @@ async fn register(
 
   // TODO: no unwraps
   //
-  client.post(&*REGISTER_ENDPOINT)
+  client
+    .post(&*REGISTER_ENDPOINT)
     .header("Content-Type", "application/json")
     .header("Authorization", admin_token.bearer().await.unwrap())
     .send_json(&registration)
