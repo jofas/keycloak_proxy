@@ -14,9 +14,6 @@ TODO
 
 * logging
 
-* tests (with a docker-compose file running some random keycloak
-  server and database -- database must be part of repo)
-
 * clippy setup
 
 * documentation
