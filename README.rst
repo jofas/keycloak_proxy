@@ -54,3 +54,9 @@ TODO
 * pipeline
 
 * codecov
+
+
+Links
+-----
+
+* `<https://www.appsdeveloperblog.com/keycloak-rest-api-create-a-new-user/>`_
