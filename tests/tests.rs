@@ -1,4 +1,4 @@
-use actix_web::{test, App};
+use actix_web::{client::Client, test, App};
 
 use actix_oidc_token::{TokenRequest, TokenResponse};
 
@@ -34,8 +34,10 @@ async fn password_request() {
     .await
     .unwrap();
 
-  let _token_response: TokenResponse =
+  let token_response: TokenResponse =
     serde_json::from_slice(&bytes).unwrap();
+
+  assert!(token_response.refresh_token.is_some());
 }
 
 #[actix_rt::test]
@@ -59,4 +61,20 @@ async fn password_request_with_invalid_credentials() {
   let resp = test::call_service(&mut app, req).await;
 
   assert!(resp.status().is_client_error());
+}
+
+#[actix_rt::test]
+async fn admin_token() {
+  let client = Client::default();
+
+  let admin_token = init_admin_token().await;
+
+  let token_response = admin_token.token_response().await.unwrap();
+
+  admin_token.refresh_token(&client).await;
+
+  let new_token_response =
+    admin_token.token_response().await.unwrap();
+
+  assert!(new_token_response != token_response);
 }

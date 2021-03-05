@@ -114,7 +114,7 @@ dependencies = [
 [[package]]
 name = "actix-oidc-token"
 version = "0.1.0"
-source = "git+https://github.com/jofas/actix_oidc_token#2ee89abb028185a9654a326dafd6d138c24ae6d2"
+source = "git+https://github.com/jofas/actix_oidc_token#e9708d41145329883af2cec747504621592db23e"
 dependencies = [
  "actix-web",
  "actix-web-httpauth",
@@ -346,9 +346,9 @@ dependencies = [
 
 [[package]]
 name = "async-trait"
-version = "0.1.42"
+version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d3a45e77e34375a7923b1e8febb049bb011f064714a8e17a1a616fef01da13d"
+checksum = "3a4c64e223db1fffa7683a719921434caa880463cfa5820032b063c9ecd5cc49"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1540,9 +1540,9 @@ checksum = "213701ba3370744dcd1a12960caa4843b3d68b4d1c0a5d575e0d65b2ee9d16c0"
 
 [[package]]
 name = "syn"
-version = "1.0.60"
+version = "1.0.61"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c700597eca8a5a762beb35753ef6b94df201c81cca676604f547495a0d7f0081"
+checksum = "ed22b90a0e734a23a7610f4283ac9e5acfb96cbb30dfefa540d66f866f1c09c5"
 dependencies = [
  "proc-macro2",
  "quote",
