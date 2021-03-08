@@ -15,4 +15,17 @@ get_admin_token() {
     http://0.0.0.0:8080/auth/realms/master/protocol/openid-connect/token
 }
 
-get_admin_token
+register() {
+  curl -X POST -v -H 'content-type: application/json' \
+    -d '{
+      "first_name": "jonas",
+      "last_name": "fassbender",
+      "username": "jcool2",
+      "email": "jonas2@fc-web.de",
+      "password": "supercool"
+    }' \
+    http://0.0.0.0:$KEYCLOAK_PROXY_PORT/register
+}
+
+register
+#get_admin_token

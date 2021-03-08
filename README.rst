@@ -38,6 +38,26 @@ Setting Up The Test Environment
     and ``sh debug_request.sh`` from another prompt
 
 
+Enabling Permissions For The Admin Cli
+--------------------------------------
+
+Some features (like registration) rely on the proxy having access to
+Keycloak's admin REST API. Besides the ``admin-cli`` setup (for
+``client_id`` and ``client_secret``), you also need to enable the
+right permissions:
+
+1. start the ``keycloak_proxy`` server, e.g. via executing
+   ``cargo run``
+
+2. go to ``master->clients->admin-cli->sessions``
+
+3. there you should see at least one session of the
+   ``service-account-admin-cli`` user. Click on one of these and
+   navigate to ``role mappings``
+
+4. Add the ``admin`` role
+
+
 TODO
 ----
 
@@ -62,3 +82,5 @@ Links
 -----
 
 * `<https://www.appsdeveloperblog.com/keycloak-rest-api-create-a-new-user/>`_
+
+* `<https://stackoverflow.com/questions/65946850/keycloak-api-to-create-users-returns-a-403-forbidden>`_
