@@ -93,7 +93,7 @@ async fn delete_from_self() {
 }
 
 #[actix_rt::test]
-async fn delte_from_other() {
+async fn delete_from_other() {
   jonases_tracing_util::init_logger();
 
   register_user("testuser2", "pw", "test2@fassbender.dev").await;
