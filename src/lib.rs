@@ -307,17 +307,3 @@ impl actix_web::error::ResponseError for Error {
     StatusCode::INTERNAL_SERVER_ERROR
   }
 }
-
-/*
-  let body =
-    response.body().await.map_err(log_simple_err_callback(
-      "encountered payload error from one api response",
-    ))?;
-  let body = String::from_utf8_lossy(&*body);
-
-  event!(Level::DEBUG, raw_one_api_response = %body);
-
-  Ok(serde_json::from_str(&body).map_err(log_simple_err_callback(
-    "could not parse one_api_response",
-  ))?)
-*/
