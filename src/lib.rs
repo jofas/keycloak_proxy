@@ -30,12 +30,15 @@ pub struct KeycloakProxyApp {
   key_set: Arc<KeyStore>,
   endpoints: KeycloakEndpoints,
   client_id: ClientId,
+  su: SuperUser,
 }
 
 impl KeycloakProxyApp {
   pub async fn init() -> Result<Self, VarError> {
     let client_id =
       ClientId::new(logged_var("KEYCLOAK_PROXY_CLIENT_ID")?);
+
+    let su = SuperUser::new(logged_var("KEYCLOAK_PROXY_SU")?);
 
     let endpoints = KeycloakEndpoints::new(
       logged_var("KEYCLOAK_PROXY_KEYCLOAK_SERVER")?,
@@ -51,6 +54,7 @@ impl KeycloakProxyApp {
       key_set,
       endpoints,
       client_id,
+      su,
     })
   }
 
@@ -67,8 +71,9 @@ impl KeycloakProxyApp {
     cfg
       .data(self.admin_token)
       .data(self.key_set)
-      .data(self.client_id)
       .data(self.endpoints)
+      .data(self.client_id)
+      .data(self.su)
       .data(Client::builder().disable_timeout().finish())
       .service(certs)
       .service(token)
@@ -95,12 +100,24 @@ impl KeycloakProxyApp {
   }
 }
 
+// TODO: to_string() -> inner()
 #[derive(Clone, new)]
 struct ClientId {
   inner: String,
 }
 
 impl fmt::Display for ClientId {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.inner)
+  }
+}
+
+#[derive(Clone, new)]
+struct SuperUser {
+  inner: String,
+}
+
+impl fmt::Display for SuperUser {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", self.inner)
   }
@@ -191,6 +208,16 @@ pub struct ProxyRegisterRequest {
   password: String,
 }
 
+#[derive(Serialize, Deserialize, Clone, DisplayAsJson)]
+#[serde(rename_all(deserialize = "camelCase"))]
+struct User {
+  id: String,
+  username: String,
+  first_name: String,
+  last_name: String,
+  email: String,
+}
+
 #[post("/token")]
 async fn token(
   request: HttpRequest,
@@ -241,25 +268,18 @@ async fn register(
     .into_wrapped_http_response()
 }
 
-#[derive(Serialize, Deserialize, Clone, DisplayAsJson)]
-#[serde(rename_all(deserialize = "camelCase"))]
-struct User {
-  id: String,
-  username: String,
-  first_name: String,
-  last_name: String,
-  email: String,
-}
-
 #[delete("/user/{username}")]
 async fn delete_user(
   web::Path((username,)): web::Path<(String,)>,
   client: web::Data<Client>,
   admin_token: web::Data<AccessToken>,
   endpoints: web::Data<KeycloakEndpoints>,
+  su: web::Data<SuperUser>,
   jwt_user: JwtUser,
 ) -> Result<HttpResponse, Error> {
-  if username != jwt_user.username {
+  if username != jwt_user.username
+    && jwt_user.username != su.to_string()
+  {
     event!(Level::ERROR, "access to endpoint denied");
     return Ok(HttpResponse::Unauthorized().finish());
   }
