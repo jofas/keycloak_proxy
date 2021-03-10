@@ -15,10 +15,12 @@ Setting Up The Test Environment
 3. click on admin console and sign in (username: ``admin``,
    pasword: ``admin``)
 
-4. create a new realm called ``test_realm``
+4. create a new realm called ``test_realm`` (add it to your
+   ``KEYCLOAK_PROXY_REALM`` variable from your ``.env`` file
 
 5. open ``test_realm->clients`` and create a new client named
-   ``keycloak_proxy``
+   ``keycloak_proxy``, or whatever you please. You need to add it
+   to your ``KEYCLOAK_PROXY_CLIENT_ID`` environment variable
 
 6. go back to ``master->clients`` and open ``admin-cli`` client
 
@@ -60,6 +62,9 @@ right permissions:
 
 TODO
 ----
+
+* verbose treatment of how to properly set up the environment for
+  testing
 
 * use docker hub instead of gcr.io
 
