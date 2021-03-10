@@ -7,6 +7,9 @@ use actix_oidc_token::{AccessToken, TokenRequest};
 
 use actix_proxy::IntoHttpResponse;
 
+use actix_jwt_validator_middleware::jwks_client::keyset::KeyStore;
+use actix_jwt_validator_middleware::{init_key_set, jwt_validator};
+
 use serde::{Deserialize, Serialize};
 
 use display_json::DisplayAsJson;
@@ -18,8 +21,80 @@ use jonases_tracing_util::{log_simple_err_callback, logged_var};
 
 use std::env::VarError;
 use std::fmt;
+use std::sync::Arc;
 
-#[derive(new)]
+#[derive(Clone)]
+pub struct KeycloakProxyApp {
+  admin_token: AccessToken,
+  key_set: Arc<KeyStore>,
+  endpoints: KeycloakEndpoints,
+  client_id: ClientId,
+}
+
+impl KeycloakProxyApp {
+  pub async fn init() -> Result<Self, VarError> {
+    let client_id =
+      ClientId::new(logged_var("KEYCLOAK_PROXY_CLIENT_ID")?);
+
+    let endpoints = KeycloakEndpoints::new(
+      logged_var("KEYCLOAK_PROXY_KEYCLOAK_SERVER")?,
+      logged_var("KEYCLOAK_PROXY_REALM")?,
+    );
+
+    let admin_token = Self::init_admin_token().await?;
+    // TODO: no unwrap
+    let key_set = init_key_set(&endpoints.certs()).await.unwrap();
+
+    Ok(KeycloakProxyApp {
+      admin_token,
+      key_set,
+      endpoints,
+      client_id,
+    })
+  }
+
+  pub fn config(self) -> impl FnOnce(&mut web::ServiceConfig) {
+    move |cfg: &mut web::ServiceConfig| {
+      self.build_config(cfg);
+    }
+  }
+
+  fn build_config(self, cfg: &mut web::ServiceConfig) {
+    let needs_auth_scope =
+      web::scope("/").wrap(jwt_validator()).service(delete_user);
+
+    cfg
+      .data(self.admin_token)
+      .data(self.key_set)
+      .data(self.client_id)
+      .data(self.endpoints)
+      .data(Client::builder().disable_timeout().finish())
+      .service(certs)
+      .service(token)
+      .service(register)
+      .service(needs_auth_scope);
+  }
+
+  async fn init_admin_token() -> Result<AccessToken, VarError> {
+    let admin_token_request = TokenRequest::client_credentials(
+      "admin-cli".to_owned(),
+      logged_var("KEYCLOAK_PROXY_ADMIN_CLI_SECRET")?,
+    );
+
+    let admin_token_endpoint = format!(
+      "http://{}:8080/auth/realms/master/protocol/openid-connect/token",
+      logged_var("KEYCLOAK_PROXY_KEYCLOAK_SERVER")?,
+    );
+
+    Ok(
+      AccessToken::new(admin_token_endpoint, admin_token_request)
+        .periodically_refresh()
+        .await,
+    )
+  }
+}
+
+#[derive(Clone, new)]
 struct ClientId {
   inner: String,
 }
@@ -30,7 +105,7 @@ impl fmt::Display for ClientId {
   }
 }
 
-#[derive(new)]
+#[derive(Clone, new)]
 struct KeycloakEndpoints {
   keycloak_server: String,
   realm: String,
@@ -71,43 +146,6 @@ impl KeycloakEndpoints {
       self.keycloak_server, self.realm, id
     )
   }
-}
-
-pub fn app_config(cfg: &mut web::ServiceConfig) {
-  let client_id =
-    ClientId::new(logged_var("KEYCLOAK_PROXY_CLIENT_ID").unwrap());
-
-  let endpoints = KeycloakEndpoints::new(
-    logged_var("KEYCLOAK_PROXY_KEYCLOAK_SERVER").unwrap(),
-    logged_var("KEYCLOAK_PROXY_REALM").unwrap(),
-  );
-
-  cfg
-    .data(client_id)
-    .data(endpoints)
-    .data(Client::builder().disable_timeout().finish())
-    .service(certs)
-    .service(token)
-    .service(register)
-    .service(delete_user);
-}
-
-pub async fn init_admin_token() -> Result<AccessToken, VarError> {
-  let admin_token_request = TokenRequest::client_credentials(
-    "admin-cli".to_owned(),
-    logged_var("KEYCLOAK_PROXY_ADMIN_CLI_SECRET")?,
-  );
-
-  let admin_token_endpoint = format!(
-    "http://{}:8080/auth/realms/master/protocol/openid-connect/token",
-    logged_var("KEYCLOAK_PROXY_KEYCLOAK_SERVER")?,
-  );
-
-  Ok(
-    AccessToken::new(admin_token_endpoint, admin_token_request)
-      .periodically_refresh()
-      .await,
-  )
 }
 
 #[derive(Serialize, Deserialize, Debug)]

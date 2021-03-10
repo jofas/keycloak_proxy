@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 display_json = { git = "https://github.com/jofas/display_json" }
 jonases-tracing-util = { git = "https://github.com/jofas/jonases_tracing_util" }
+actix-jwt-validator-middleware = { git = "https://github.com/jofas/actix_jwt_validator_middleware" }
 actix-proxy = { git = "https://github.com/jofas/actix_proxy" }
 actix-oidc-token = { git = "https://github.com/jofas/actix_oidc_token" }
 actix-web = "^3.3.2"

@@ -1,4 +1,4 @@
-use actix_web::{client::Client, test, App};
+use actix_web::{test, App};
 
 use actix_oidc_token::{TokenRequest, TokenResponse};
 
@@ -6,15 +6,14 @@ use futures::stream::TryStreamExt;
 
 use std::env;
 
-use keycloak_proxy::{app_config, init_admin_token};
+use keycloak_proxy::KeycloakProxyApp;
 
 #[actix_rt::test]
 async fn password_request() {
-  let admin_token = init_admin_token().await;
-  let mut app = test::init_service(
-    App::new().configure(app_config).data(admin_token),
-  )
-  .await;
+  let app = KeycloakProxyApp::init().await.unwrap();
+
+  let mut app =
+    test::init_service(App::new().configure(app.config())).await;
 
   let token_request = TokenRequest::password(
     env::var("TEST_USERNAME").unwrap(),
@@ -42,12 +41,10 @@ async fn password_request() {
 
 #[actix_rt::test]
 async fn password_request_with_invalid_credentials() {
-  let admin_token = init_admin_token().await.unwrap();
+  let app = KeycloakProxyApp::init().await.unwrap();
 
-  let mut app = test::init_service(
-    App::new().configure(app_config).data(admin_token),
-  )
-  .await;
+  let mut app =
+    test::init_service(App::new().configure(app.config())).await;
 
   let token_request = TokenRequest::password(
     "not a user".to_owned(),
@@ -62,20 +59,4 @@ async fn password_request_with_invalid_credentials() {
   let resp = test::call_service(&mut app, req).await;
 
   assert!(resp.status().is_client_error());
-}
-
-#[actix_rt::test]
-async fn admin_token() {
-  let client = Client::default();
-
-  let admin_token = init_admin_token().await.unwrap();
-
-  let token_response = admin_token.token_response().await.unwrap();
-
-  admin_token.refresh_token(&client).await;
-
-  let new_token_response =
-    admin_token.token_response().await.unwrap();
-
-  assert!(new_token_response != token_response);
 }
