@@ -42,7 +42,8 @@ async fn password_request() {
 
 #[actix_rt::test]
 async fn password_request_with_invalid_credentials() {
-  let admin_token = init_admin_token().await;
+  let admin_token = init_admin_token().await.unwrap();
+
   let mut app = test::init_service(
     App::new().configure(app_config).data(admin_token),
   )
@@ -67,7 +68,7 @@ async fn password_request_with_invalid_credentials() {
 async fn admin_token() {
   let client = Client::default();
 
-  let admin_token = init_admin_token().await;
+  let admin_token = init_admin_token().await.unwrap();
 
   let token_response = admin_token.token_response().await.unwrap();
 

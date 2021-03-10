@@ -20,12 +20,20 @@ register() {
     -d '{
       "first_name": "jonas",
       "last_name": "fassbender",
-      "username": "jcool2",
-      "email": "jonas2@fc-web.de",
+      "username": "jcool3",
+      "email": "jonas3@fc-web.de",
       "password": "supercool"
     }' \
     http://0.0.0.0:$KEYCLOAK_PROXY_PORT/register
 }
 
-register
+delete_user() {
+  TOKEN=$(get_token jcool3 supercool | jq .access_token)
+  echo $TOKEN
+  curl -X DELETE -v http://0.0.0.0:$KEYCLOAK_PROXY_PORT/user/jcool3
+}
+
+#register
+delete_user
 #get_admin_token
+#get_token $TEST_USERNAME $TEST_PASSWORD

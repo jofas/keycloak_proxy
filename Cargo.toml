@@ -7,6 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+jonases-tracing-util = { git = "https://github.com/jofas/jonases_tracing_util" }
 actix-proxy = { git = "https://github.com/jofas/actix_proxy" }
 actix-oidc-token = { git = "https://github.com/jofas/actix_oidc_token" }
 actix-web = "^3.3.2"
@@ -15,4 +16,4 @@ actix-cors = "*"
 futures = "^0.3.13"
 serde = { version = "^1.0.123", features = ["derive"] }
 serde_json = "^1.0.59"
-lazy_static = "*"
+derive-new = "^0.5.9"

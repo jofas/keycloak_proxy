@@ -11,7 +11,7 @@ async fn main() -> std::io::Result<()> {
   let port = env::var("KEYCLOAK_PROXY_PORT").unwrap();
   let addr = format!("0.0.0.0:{}", port);
 
-  let admin_token = init_admin_token().await;
+  let admin_token = init_admin_token().await.unwrap();
 
   println!("STARTING KEYCLOAK_PROXY SERVER");
 

@@ -1,5 +1,5 @@
 use actix_web::client::{Client, SendRequestError};
-use actix_web::{get, post, web, HttpRequest, HttpResponse};
+use actix_web::{delete, get, post, web, HttpRequest, HttpResponse};
 
 use actix_oidc_token::{AccessToken, TokenRequest};
 
@@ -7,56 +7,95 @@ use actix_proxy::IntoHttpResponse;
 
 use serde::{Deserialize, Serialize};
 
-use lazy_static::lazy_static;
+use derive_new::new;
 
-use std::env;
+use jonases_tracing_util::logged_var;
 
-// TODO: into Env struct
-lazy_static! {
-  static ref CLIENT_ID: String =
-    env::var("KEYCLOAK_PROXY_CLIENT_ID").unwrap();
-  static ref ADMIN_CLI_SECRET: String =
-    env::var("KEYCLOAK_PROXY_ADMIN_CLI_SECRET").unwrap();
-  static ref CERTS_ENDPOINT: String = format!(
-    "http://{}:8080/auth/realms/{}/protocol/openid-connect/certs",
-    env::var("KEYCLOAK_PROXY_KEYCLOAK_SERVER").unwrap(),
-    env::var("KEYCLOAK_PROXY_REALM").unwrap(),
-  );
-  static ref TOKEN_ENDPOINT: String = format!(
-    "http://{}:8080/auth/realms/{}/protocol/openid-connect/token",
-    env::var("KEYCLOAK_PROXY_KEYCLOAK_SERVER").unwrap(),
-    env::var("KEYCLOAK_PROXY_REALM").unwrap(),
-  );
-  static ref REGISTER_ENDPOINT: String = format!(
-    "http://{}:8080/auth/admin/realms/{}/users",
-    env::var("KEYCLOAK_PROXY_KEYCLOAK_SERVER").unwrap(),
-    env::var("KEYCLOAK_PROXY_REALM").unwrap(),
-  );
-  static ref ADMIN_TOKEN_ENDPOINT: String = format!(
-    "http://{}:8080/auth/realms/master/protocol/openid-connect/token",
-    env::var("KEYCLOAK_PROXY_KEYCLOAK_SERVER").unwrap(),
-  );
+use std::env::VarError;
+use std::fmt;
+
+#[derive(new)]
+struct ClientId {
+  inner: String,
 }
 
-static ADMIN_CLI_CLIENT_ID: &'static str = "admin-cli";
+impl fmt::Display for ClientId {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.inner)
+  }
+}
+
+#[derive(new)]
+struct KeycloakEndpoints {
+  keycloak_server: String,
+  realm: String,
+}
+
+impl KeycloakEndpoints {
+  fn certs(&self) -> String {
+    format!(
+      "http://{}:8080/auth/realms/{}/protocol/openid-connect/certs",
+      self.keycloak_server, self.realm,
+    )
+  }
+
+  fn token(&self) -> String {
+    format!(
+      "http://{}:8080/auth/realms/{}/protocol/openid-connect/token",
+      self.keycloak_server, self.realm,
+    )
+  }
+
+  fn register(&self) -> String {
+    format!(
+      "http://{}:8080/auth/admin/realms/{}/users",
+      self.keycloak_server, self.realm,
+    )
+  }
+
+  fn user(&self, username: &str) -> String {
+    format!(
+      "http://{}:8080/auth/admin/realms/{}/users?username={}",
+      self.keycloak_server, self.realm, username
+    )
+  }
+}
 
 pub fn app_config(cfg: &mut web::ServiceConfig) {
+  let client_id =
+    ClientId::new(logged_var("KEYCLOAK_PROXY_CLIENT_ID").unwrap());
+
+  let endpoints = KeycloakEndpoints::new(
+    logged_var("KEYCLOAK_PROXY_KEYCLOAK_SERVER").unwrap(),
+    logged_var("KEYCLOAK_PROXY_REALM").unwrap(),
+  );
+
   cfg
+    .data(client_id)
+    .data(endpoints)
     .data(Client::builder().disable_timeout().finish())
     .service(certs)
     .service(token)
-    .service(register);
+    .service(register)
+    .service(delete_user);
 }
 
-pub async fn init_admin_token() -> AccessToken {
+pub async fn init_admin_token() -> Result<AccessToken, VarError> {
   let admin_token_request = TokenRequest::client_credentials(
-    ADMIN_CLI_CLIENT_ID.to_owned(),
-    ADMIN_CLI_SECRET.clone(),
+    "admin-cli".to_owned(),
+    logged_var("KEYCLOAK_PROXY_ADMIN_CLI_SECRET")?,
   );
 
-  AccessToken::new(ADMIN_TOKEN_ENDPOINT.clone(), admin_token_request)
-    .periodically_refresh()
-    .await
+  let admin_token_endpoint = format!(
+    "http://{}:8080/auth/realms/master/protocol/openid-connect/token",
+    logged_var("KEYCLOAK_PROXY_KEYCLOAK_SERVER")?,
+  );
+
+  Ok(
+    AccessToken::new(admin_token_endpoint, admin_token_request)
+      .periodically_refresh()
+      .await,
+  )
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -106,10 +145,14 @@ async fn token(
   request: HttpRequest,
   body: web::Form<TokenRequest>,
   client: web::Data<Client>,
+  client_id: web::Data<ClientId>,
+  endpoints: web::Data<KeycloakEndpoints>,
 ) -> Result<HttpResponse, SendRequestError> {
   client
-    .request_from(&*TOKEN_ENDPOINT, request.head())
-    .send_form(&body.into_inner().add_client_id(CLIENT_ID.clone()))
+    .request_from(&endpoints.token(), request.head())
+    .send_form(
+      &body.into_inner().add_client_id(client_id.to_string()),
+    )
     .await?
     .into_wrapped_http_response()
 }
@@ -117,9 +160,10 @@ async fn token(
 #[get("/certs")]
 async fn certs(
   client: web::Data<Client>,
+  endpoints: web::Data<KeycloakEndpoints>,
 ) -> Result<HttpResponse, SendRequestError> {
   client
-    .get(&*CERTS_ENDPOINT)
+    .get(&endpoints.certs())
     .send()
     .await?
     .into_wrapped_http_response()
@@ -130,6 +174,7 @@ async fn register(
   client: web::Data<Client>,
   admin_token: web::Data<AccessToken>,
   registration_data: web::Json<ProxyRegisterRequest>,
+  endpoints: web::Data<KeycloakEndpoints>,
 ) -> Result<HttpResponse, SendRequestError> {
   let registration =
     RegisterRequest::from(registration_data.into_inner());
@@ -137,10 +182,29 @@ async fn register(
   // TODO: no unwraps
   //
   client
-    .post(&*REGISTER_ENDPOINT)
+    .post(&endpoints.register())
     .header("Content-Type", "application/json")
     .header("Authorization", admin_token.bearer().await.unwrap())
     .send_json(&registration)
     .await?
     .into_wrapped_http_response()
+}
+
+#[delete("/user/{username}")]
+async fn delete_user(
+  web::Path((username,)): web::Path<(String,)>,
+  client: web::Data<Client>,
+  admin_token: web::Data<AccessToken>,
+  endpoints: web::Data<KeycloakEndpoints>,
+) -> Result<HttpResponse, SendRequestError> {
+  let user = client
+    .get(&endpoints.user(&username))
+    .header("Authorization", admin_token.bearer().await.unwrap())
+    .send()
+    .await?;
+
+  // TODO: print body and then create a User struct
+  println!("{:?}", user);
+
+  Ok(HttpResponse::Ok().finish())
 }
