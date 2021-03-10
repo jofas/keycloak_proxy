@@ -104,13 +104,15 @@ dependencies = [
 [[package]]
 name = "actix-jwt-validator-middleware"
 version = "0.1.0"
-source = "git+https://github.com/jofas/actix_jwt_validator_middleware#8e75b79e2c4281507e3bb2f04fb1399952f954fb"
+source = "git+https://github.com/jofas/actix_jwt_validator_middleware#3c835fc0195776dc2c24d389e630a35a2d39dbd3"
 dependencies = [
  "actix-web",
  "actix-web-httpauth",
+ "display_json",
  "futures",
  "jonases-tracing-util",
  "jwks-client",
+ "serde",
 ]
 
 [[package]]
@@ -614,13 +616,21 @@ checksum = "212d0f5754cb6769937f4501cc0e67f4f4483c8d2c3e1e922ee9edbe4ab4c7c0"
 [[package]]
 name = "display_json"
 version = "0.1.0"
-source = "git+https://github.com/jofas/display_json#77acd733d02f3d1ceb67fd1ca0be360be90ca254"
+source = "git+https://github.com/jofas/display_json#94bf6735919a970094f5bfb7d92fac2c8cf2fabb"
 dependencies = [
- "proc-macro2",
- "quote",
+ "display_json_derive",
  "serde",
  "serde_derive",
  "serde_json",
+]
+
+[[package]]
+name = "display_json_derive"
+version = "0.1.0"
+source = "git+https://github.com/jofas/display_json#94bf6735919a970094f5bfb7d92fac2c8cf2fabb"
+dependencies = [
+ "proc-macro2",
+ "quote",
  "syn",
 ]
 

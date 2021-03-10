@@ -10,6 +10,8 @@ use keycloak_proxy::{KeycloakProxyApp, ProxyRegisterRequest};
 
 #[actix_rt::test]
 async fn password_request() {
+  jonases_tracing_util::init_logger();
+
   let app = KeycloakProxyApp::init().await.unwrap();
 
   let mut app =
@@ -41,6 +43,8 @@ async fn password_request() {
 
 #[actix_rt::test]
 async fn password_request_with_invalid_credentials() {
+  jonases_tracing_util::init_logger();
+
   let app = KeycloakProxyApp::init().await.unwrap();
 
   let mut app =
@@ -63,6 +67,8 @@ async fn password_request_with_invalid_credentials() {
 
 #[actix_rt::test]
 async fn register() {
+  jonases_tracing_util::init_logger();
+
   let app = KeycloakProxyApp::init().await.unwrap();
 
   let mut app =
@@ -117,3 +123,5 @@ async fn register() {
 
   assert!(resp.status().is_success());
 }
+
+// test deleting with wrong account + test with superuser account

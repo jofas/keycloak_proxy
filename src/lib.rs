@@ -8,6 +8,7 @@ use actix_oidc_token::{AccessToken, TokenRequest};
 use actix_proxy::IntoHttpResponse;
 
 use actix_jwt_validator_middleware::jwks_client::keyset::KeyStore;
+use actix_jwt_validator_middleware::User as JwtUser;
 use actix_jwt_validator_middleware::{init_key_set, jwt_validator};
 
 use serde::{Deserialize, Serialize};
@@ -256,7 +257,13 @@ async fn delete_user(
   client: web::Data<Client>,
   admin_token: web::Data<AccessToken>,
   endpoints: web::Data<KeycloakEndpoints>,
+  jwt_user: JwtUser,
 ) -> Result<HttpResponse, Error> {
+  if username != jwt_user.username {
+    event!(Level::ERROR, "access to endpoint denied");
+    return Ok(HttpResponse::Unauthorized().finish());
+  }
+
   let mut response = client
     .get(&endpoints.user_query_by_username(&username))
     .header("Authorization", admin_token.bearer().await.unwrap())
@@ -305,16 +312,10 @@ async fn delete_user(
   }
 }
 
-#[derive(Serialize, Debug)]
+#[derive(Serialize, Debug, DisplayAsJson)]
 enum Error {
   SendRequestError,
   PayloadError,
-}
-
-impl fmt::Display for Error {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{:?}", self)
-  }
 }
 
 impl From<SendRequestError> for Error {
