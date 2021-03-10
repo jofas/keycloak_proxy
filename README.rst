@@ -68,8 +68,6 @@ TODO
 
 * use docker hub instead of gcr.io
 
-* base_url environment variables
-
 * enable multiple realms
 
 * logging

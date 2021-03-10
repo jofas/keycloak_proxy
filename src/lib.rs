@@ -41,7 +41,7 @@ impl KeycloakProxyApp {
     let su = SuperUser::new(logged_var("KEYCLOAK_PROXY_SU")?);
 
     let endpoints = KeycloakEndpoints::new(
-      logged_var("KEYCLOAK_PROXY_KEYCLOAK_SERVER")?,
+      logged_var("KEYCLOAK_PROXY_KEYCLOAK_BASE_URL")?,
       logged_var("KEYCLOAK_PROXY_REALM")?,
     );
 
@@ -88,8 +88,8 @@ impl KeycloakProxyApp {
     );
 
     let admin_token_endpoint = format!(
-      "http://{}:8080/auth/realms/master/protocol/openid-connect/token",
-      logged_var("KEYCLOAK_PROXY_KEYCLOAK_SERVER")?,
+      "{}/auth/realms/master/protocol/openid-connect/token",
+      logged_var("KEYCLOAK_PROXY_KEYCLOAK_BASE_URL")?,
     );
 
     Ok(
@@ -132,35 +132,35 @@ struct KeycloakEndpoints {
 impl KeycloakEndpoints {
   fn certs(&self) -> String {
     format!(
-      "http://{}:8080/auth/realms/{}/protocol/openid-connect/certs",
+      "{}/auth/realms/{}/protocol/openid-connect/certs",
       self.keycloak_server, self.realm,
     )
   }
 
   fn token(&self) -> String {
     format!(
-      "http://{}:8080/auth/realms/{}/protocol/openid-connect/token",
+      "{}/auth/realms/{}/protocol/openid-connect/token",
       self.keycloak_server, self.realm,
     )
   }
 
   fn register(&self) -> String {
     format!(
-      "http://{}:8080/auth/admin/realms/{}/users",
+      "{}/auth/admin/realms/{}/users",
       self.keycloak_server, self.realm,
     )
   }
 
   fn user_query_by_username(&self, username: &str) -> String {
     format!(
-      "http://{}:8080/auth/admin/realms/{}/users?username={}",
+      "{}/auth/admin/realms/{}/users?username={}",
       self.keycloak_server, self.realm, username
     )
   }
 
   fn user(&self, id: &str) -> String {
     format!(
-      "http://{}:8080/auth/admin/realms/{}/users/{}",
+      "{}/auth/admin/realms/{}/users/{}",
       self.keycloak_server, self.realm, id
     )
   }
