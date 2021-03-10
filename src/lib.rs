@@ -181,8 +181,8 @@ struct Credentials {
   value: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct ProxyRegisterRequest {
+#[derive(Serialize, Deserialize, Debug, new)]
+pub struct ProxyRegisterRequest {
   first_name: String,
   last_name: String,
   username: String,
