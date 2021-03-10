@@ -7,6 +7,7 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+display_json = { git = "https://github.com/jofas/display_json" }
 jonases-tracing-util = { git = "https://github.com/jofas/jonases_tracing_util" }
 actix-proxy = { git = "https://github.com/jofas/actix_proxy" }
 actix-oidc-token = { git = "https://github.com/jofas/actix_oidc_token" }

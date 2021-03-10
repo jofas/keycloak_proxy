@@ -2,18 +2,21 @@ use actix_web::{App, HttpServer};
 
 use actix_cors::Cors;
 
-use std::env;
+use jonases_tracing_util::tracing::{event, Level};
+use jonases_tracing_util::{init_logger, logged_var};
 
 use keycloak_proxy::{app_config, init_admin_token};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-  let port = env::var("KEYCLOAK_PROXY_PORT").unwrap();
+  init_logger();
+
+  let port = logged_var("KEYCLOAK_PROXY_PORT").unwrap();
   let addr = format!("0.0.0.0:{}", port);
 
   let admin_token = init_admin_token().await.unwrap();
 
-  println!("STARTING KEYCLOAK_PROXY SERVER");
+  event!(Level::INFO, "STARTING KEYCLOAK_PROXY SERVER");
 
   HttpServer::new(move || {
     App::new()
