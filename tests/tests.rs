@@ -104,7 +104,7 @@ async fn delete_from_other() {
   )
   .await;
 
-  assert_eq!(delete_user("testuser2", tkn).await, 401);
+  assert_eq!(delete_user("testuser2", tkn).await, 403);
 
   let tkn = token("testuser2", "pw").await;
 

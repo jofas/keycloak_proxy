@@ -1,7 +1,9 @@
 use actix_web::client::{Client, PayloadError, SendRequestError};
 use actix_web::dev::HttpResponseBuilder;
 use actix_web::http::StatusCode;
-use actix_web::{delete, get, post, web, HttpRequest, HttpResponse};
+use actix_web::{
+  delete, get, post, put, web, HttpRequest, HttpResponse,
+};
 
 use actix_oidc_token::{AccessToken, TokenRequest};
 
@@ -184,6 +186,7 @@ impl From<ProxyRegisterRequest> for RegisterRequest {
       last_name: proxy.last_name,
       email: proxy.email,
       enabled: true,
+      // TODO: if no password, then email_verified = false
       username: proxy.username,
       credentials: vec![Credentials {
         r#type: String::from("password"),
@@ -205,7 +208,7 @@ pub struct ProxyRegisterRequest {
   last_name: String,
   username: String,
   email: String,
-  password: String,
+  password: String, // you go away
 }
 
 #[derive(Serialize, Deserialize, Clone, DisplayAsJson)]
@@ -268,6 +271,18 @@ async fn register(
     .into_wrapped_http_response()
 }
 
+#[put("/user/{username}/password")]
+async fn set_password(
+  web::Path((username,)): web::Path<(String,)>,
+  client: web::Data<Client>,
+  admin_token: web::Data<AccessToken>,
+  endpoints: web::Data<KeycloakEndpoints>,
+  su: web::Data<SuperUser>,
+  jwt_user: JwtUser,
+) -> Result<HttpResponse, Error> {
+  Ok(HttpResponse::Ok().finish())
+}
+
 #[delete("/user/{username}")]
 async fn delete_user(
   web::Path((username,)): web::Path<(String,)>,
@@ -277,12 +292,7 @@ async fn delete_user(
   su: web::Data<SuperUser>,
   jwt_user: JwtUser,
 ) -> Result<HttpResponse, Error> {
-  if username != jwt_user.username
-    && jwt_user.username != su.to_string()
-  {
-    event!(Level::ERROR, "access to endpoint denied");
-    return Ok(HttpResponse::Unauthorized().finish());
-  }
+  has_access(&username, &jwt_user, &su.into_inner())?;
 
   let mut response = client
     .get(&endpoints.user_query_by_username(&username))
@@ -332,10 +342,24 @@ async fn delete_user(
   }
 }
 
+fn has_access(
+  endpoint: &str,
+  user: &JwtUser,
+  su: &SuperUser,
+) -> Result<(), Error> {
+  if endpoint != user.username && user.username != su.to_string() {
+    event!(Level::ERROR, "access to endpoint denied");
+    Err(Error::AccessDenied)
+  } else {
+    Ok(())
+  }
+}
+
 #[derive(Serialize, Debug, DisplayAsJson)]
 enum Error {
   SendRequestError,
   PayloadError,
+  AccessDenied,
 }
 
 impl From<SendRequestError> for Error {
@@ -363,6 +387,9 @@ impl actix_web::error::ResponseError for Error {
   }
 
   fn status_code(&self) -> StatusCode {
-    StatusCode::INTERNAL_SERVER_ERROR
+    match self {
+      Self::AccessDenied => StatusCode::FORBIDDEN,
+      _ => StatusCode::INTERNAL_SERVER_ERROR,
+    }
   }
 }
