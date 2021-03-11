@@ -88,8 +88,10 @@ impl KeycloakProxyApp {
   }
 
   fn build_config(self, cfg: &mut web::ServiceConfig) {
-    let needs_auth_scope =
-      web::scope("/").wrap(jwt_validator()).service(delete_user);
+    let needs_auth_scope = web::scope("/")
+      .wrap(jwt_validator())
+      .service(delete_user)
+      .service(set_password);
 
     cfg
       .data(self.admin_token)
@@ -303,10 +305,11 @@ async fn set_password(
   endpoints: web::Data<KeycloakEndpoints>,
   su: web::Data<SuperUser>,
   jwt_user: JwtUser,
+  password: String,
 ) -> Result<HttpResponse, Error> {
   has_access(&username, &jwt_user, &su.into_inner())?;
 
-  let user = get_user_by_username(
+  let mut user = get_user_by_username(
     &username,
     &endpoints,
     &client,
@@ -316,7 +319,18 @@ async fn set_password(
 
   event!(Level::INFO, %user);
 
-  Ok(HttpResponse::Ok().finish())
+  user.enabled = true;
+  user.credentials = vec![Credentials::password(password)];
+
+  client
+    .put(&endpoints.user(&user.id.as_ref()?))
+    .header("authorization", admin_token.bearer().await?)
+    .send_json(&user)
+    .await
+    .map_err(log_simple_err_callback(
+      "could not update user password",
+    ))?
+    .into_wrapped_http_response()
 }
 
 #[delete("/user/{username}")]
