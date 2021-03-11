@@ -137,7 +137,7 @@ async fn register_user(username: &str, password: &str, email: &str) {
     "Test".to_owned(),
     username.to_owned(),
     email.to_owned(),
-    password.to_owned(),
+    Some(password.to_owned()),
   );
 
   let req = test::TestRequest::post()

@@ -1,3 +1,5 @@
+#![feature(try_trait)]
+
 use actix_web::client::{Client, PayloadError, SendRequestError};
 use actix_web::dev::HttpResponseBuilder;
 use actix_web::http::StatusCode;
@@ -9,6 +11,7 @@ use actix_oidc_token::{AccessToken, TokenRequest};
 
 use actix_proxy::IntoHttpResponse;
 
+use actix_jwt_validator_middleware::jwks_client::error::Error as JwtError;
 use actix_jwt_validator_middleware::jwks_client::keyset::KeyStore;
 use actix_jwt_validator_middleware::User as JwtUser;
 use actix_jwt_validator_middleware::{init_key_set, jwt_validator};
@@ -24,6 +27,7 @@ use jonases_tracing_util::{log_simple_err_callback, logged_var};
 
 use std::env::VarError;
 use std::fmt;
+use std::option::NoneError;
 use std::sync::Arc;
 
 #[derive(Clone)]
@@ -35,8 +39,26 @@ pub struct KeycloakProxyApp {
   su: SuperUser,
 }
 
+#[derive(Debug)]
+pub enum InitError {
+  VarError,
+  KeyStoreInitError,
+}
+
+impl From<VarError> for InitError {
+  fn from(_: VarError) -> Self {
+    Self::VarError
+  }
+}
+
+impl From<JwtError> for InitError {
+  fn from(_: JwtError) -> Self {
+    Self::KeyStoreInitError
+  }
+}
+
 impl KeycloakProxyApp {
-  pub async fn init() -> Result<Self, VarError> {
+  pub async fn init() -> Result<Self, InitError> {
     let client_id =
       ClientId::new(logged_var("KEYCLOAK_PROXY_CLIENT_ID")?);
 
@@ -48,8 +70,7 @@ impl KeycloakProxyApp {
     );
 
     let admin_token = Self::init_admin_token().await?;
-    // TODO: no unwrap
-    let key_set = init_key_set(&endpoints.certs()).await.unwrap();
+    let key_set = init_key_set(&endpoints.certs()).await?;
 
     Ok(KeycloakProxyApp {
       admin_token,
@@ -168,7 +189,7 @@ impl KeycloakEndpoints {
   }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, new)]
 #[serde(rename_all = "camelCase")]
 struct RegisterRequest {
   first_name: String,
@@ -181,25 +202,38 @@ struct RegisterRequest {
 
 impl From<ProxyRegisterRequest> for RegisterRequest {
   fn from(proxy: ProxyRegisterRequest) -> RegisterRequest {
-    RegisterRequest {
-      first_name: proxy.first_name,
-      last_name: proxy.last_name,
-      email: proxy.email,
-      enabled: true,
-      // TODO: if no password, then email_verified = false
-      username: proxy.username,
-      credentials: vec![Credentials {
-        r#type: String::from("password"),
-        value: proxy.password,
-      }],
+    if let Some(password) = proxy.password {
+      RegisterRequest::new(
+        proxy.first_name,
+        proxy.last_name,
+        proxy.email,
+        true,
+        proxy.username,
+        vec![Credentials::password(password)],
+      )
+    } else {
+      RegisterRequest::new(
+        proxy.first_name,
+        proxy.last_name,
+        proxy.email,
+        false,
+        proxy.username,
+        vec![],
+      )
     }
   }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, new)]
 struct Credentials {
   r#type: String,
   value: String,
+}
+
+impl Credentials {
+  fn password(password: String) -> Self {
+    Self::new("password".to_owned(), password)
+  }
 }
 
 #[derive(Serialize, Deserialize, Debug, new)]
@@ -208,7 +242,7 @@ pub struct ProxyRegisterRequest {
   last_name: String,
   username: String,
   email: String,
-  password: String, // you go away
+  password: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, DisplayAsJson)]
@@ -228,7 +262,7 @@ async fn token(
   client: web::Data<Client>,
   client_id: web::Data<ClientId>,
   endpoints: web::Data<KeycloakEndpoints>,
-) -> Result<HttpResponse, SendRequestError> {
+) -> Result<HttpResponse, Error> {
   client
     .request_from(&endpoints.token(), request.head())
     .send_form(
@@ -242,7 +276,7 @@ async fn token(
 async fn certs(
   client: web::Data<Client>,
   endpoints: web::Data<KeycloakEndpoints>,
-) -> Result<HttpResponse, SendRequestError> {
+) -> Result<HttpResponse, Error> {
   client
     .get(&endpoints.certs())
     .send()
@@ -256,21 +290,20 @@ async fn register(
   admin_token: web::Data<AccessToken>,
   registration_data: web::Json<ProxyRegisterRequest>,
   endpoints: web::Data<KeycloakEndpoints>,
-) -> Result<HttpResponse, SendRequestError> {
+) -> Result<HttpResponse, Error> {
   let registration =
     RegisterRequest::from(registration_data.into_inner());
 
-  // TODO: no unwraps
-  //
   client
     .post(&endpoints.register())
     .header("Content-Type", "application/json")
-    .header("Authorization", admin_token.bearer().await.unwrap())
+    .header("Authorization", admin_token.bearer().await?)
     .send_json(&registration)
     .await?
     .into_wrapped_http_response()
 }
 
+/*
 #[put("/user/{username}/password")]
 async fn set_password(
   web::Path((username,)): web::Path<(String,)>,
@@ -282,6 +315,7 @@ async fn set_password(
 ) -> Result<HttpResponse, Error> {
   Ok(HttpResponse::Ok().finish())
 }
+*/
 
 #[delete("/user/{username}")]
 async fn delete_user(
@@ -294,9 +328,36 @@ async fn delete_user(
 ) -> Result<HttpResponse, Error> {
   has_access(&username, &jwt_user, &su.into_inner())?;
 
+  let user = get_user_by_username(
+    &username,
+    &endpoints,
+    &client,
+    &admin_token,
+  )
+  .await?;
+
+  event!(Level::INFO, %user);
+
+  client
+    .delete(&endpoints.user(&user.id))
+    .header("authorization", admin_token.bearer().await?)
+    .send()
+    .await
+    .map_err(log_simple_err_callback(
+      "could not send 'delete user' request",
+    ))?
+    .into_wrapped_http_response()
+}
+
+async fn get_user_by_username(
+  username: &str,
+  endpoints: &KeycloakEndpoints,
+  client: &Client,
+  admin_token: &AccessToken,
+) -> Result<User, Error> {
   let mut response = client
-    .get(&endpoints.user_query_by_username(&username))
-    .header("Authorization", admin_token.bearer().await.unwrap())
+    .get(&endpoints.user_query_by_username(username))
+    .header("Authorization", admin_token.bearer().await?)
     .send()
     .await
     .map_err(log_simple_err_callback(
@@ -313,32 +374,16 @@ async fn delete_user(
 
     event!(Level::DEBUG, raw_user = %body);
 
-    let users: Vec<User> = serde_json::from_str(&body).map_err(
+    let mut users: Vec<User> = serde_json::from_str(&body).map_err(
       log_simple_err_callback(
         "could not parse keycloak response to user object",
       ),
     )?;
 
-    if users.len() == 0 {
-      return Ok(HttpResponse::NotFound().finish());
-    }
-
-    let user = users[0].clone();
-
-    event!(Level::INFO, %user);
-
-    client
-      .delete(&endpoints.user(&user.id))
-      .header("Authorization", admin_token.bearer().await.unwrap())
-      .send()
-      .await
-      .map_err(log_simple_err_callback(
-        "could not send 'delete user' request",
-      ))?
-      .into_wrapped_http_response()
+    users.pop().ok_or(Error::NotFound)
   } else {
     event!(Level::ERROR, "request returned unsuccessful status code");
-    Ok(HttpResponse::InternalServerError().finish())
+    Err(Error::KeycloakError(response.status().as_u16()))
   }
 }
 
@@ -360,6 +405,9 @@ enum Error {
   SendRequestError,
   PayloadError,
   AccessDenied,
+  NoneError,
+  NotFound,
+  KeycloakError(u16),
 }
 
 impl From<SendRequestError> for Error {
@@ -380,6 +428,12 @@ impl From<serde_json::Error> for Error {
   }
 }
 
+impl From<NoneError> for Error {
+  fn from(_: NoneError) -> Self {
+    Self::NoneError
+  }
+}
+
 impl actix_web::error::ResponseError for Error {
   fn error_response(&self) -> HttpResponse {
     let mut res = HttpResponseBuilder::new(self.status_code());
@@ -389,6 +443,12 @@ impl actix_web::error::ResponseError for Error {
   fn status_code(&self) -> StatusCode {
     match self {
       Self::AccessDenied => StatusCode::FORBIDDEN,
+      Self::NotFound => StatusCode::NOT_FOUND,
+      Self::KeycloakError(status) => StatusCode::from_u16(*status)
+        .map_err(log_simple_err_callback(
+          "keycloak provided an invalid status code",
+        ))
+        .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
       _ => StatusCode::INTERNAL_SERVER_ERROR,
     }
   }
