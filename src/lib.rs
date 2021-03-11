@@ -189,21 +189,24 @@ impl KeycloakEndpoints {
   }
 }
 
-#[derive(Serialize, Deserialize, Debug, new)]
+#[derive(Serialize, Deserialize, Debug, DisplayAsJson, new)]
 #[serde(rename_all = "camelCase")]
-struct RegisterRequest {
+struct User {
+  #[new(default)]
+  id: Option<String>,
   first_name: String,
   last_name: String,
   email: String,
   enabled: bool,
   username: String,
+  #[serde(skip_deserializing)]
   credentials: Vec<Credentials>,
 }
 
-impl From<ProxyRegisterRequest> for RegisterRequest {
-  fn from(proxy: ProxyRegisterRequest) -> RegisterRequest {
+impl From<ProxyRegisterRequest> for User {
+  fn from(proxy: ProxyRegisterRequest) -> User {
     if let Some(password) = proxy.password {
-      RegisterRequest::new(
+      User::new(
         proxy.first_name,
         proxy.last_name,
         proxy.email,
@@ -212,7 +215,7 @@ impl From<ProxyRegisterRequest> for RegisterRequest {
         vec![Credentials::password(password)],
       )
     } else {
-      RegisterRequest::new(
+      User::new(
         proxy.first_name,
         proxy.last_name,
         proxy.email,
@@ -243,16 +246,6 @@ pub struct ProxyRegisterRequest {
   username: String,
   email: String,
   password: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Clone, DisplayAsJson)]
-#[serde(rename_all(deserialize = "camelCase"))]
-struct User {
-  id: String,
-  username: String,
-  first_name: String,
-  last_name: String,
-  email: String,
 }
 
 #[post("/token")]
@@ -291,8 +284,7 @@ async fn register(
   registration_data: web::Json<ProxyRegisterRequest>,
   endpoints: web::Data<KeycloakEndpoints>,
 ) -> Result<HttpResponse, Error> {
-  let registration =
-    RegisterRequest::from(registration_data.into_inner());
+  let registration = User::from(registration_data.into_inner());
 
   client
     .post(&endpoints.register())
@@ -303,7 +295,6 @@ async fn register(
     .into_wrapped_http_response()
 }
 
-/*
 #[put("/user/{username}/password")]
 async fn set_password(
   web::Path((username,)): web::Path<(String,)>,
@@ -313,9 +304,20 @@ async fn set_password(
   su: web::Data<SuperUser>,
   jwt_user: JwtUser,
 ) -> Result<HttpResponse, Error> {
+  has_access(&username, &jwt_user, &su.into_inner())?;
+
+  let user = get_user_by_username(
+    &username,
+    &endpoints,
+    &client,
+    &admin_token,
+  )
+  .await?;
+
+  event!(Level::INFO, %user);
+
   Ok(HttpResponse::Ok().finish())
 }
-*/
 
 #[delete("/user/{username}")]
 async fn delete_user(
@@ -339,7 +341,7 @@ async fn delete_user(
   event!(Level::INFO, %user);
 
   client
-    .delete(&endpoints.user(&user.id))
+    .delete(&endpoints.user(&user.id?))
     .header("authorization", admin_token.bearer().await?)
     .send()
     .await
