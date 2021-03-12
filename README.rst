@@ -60,12 +60,18 @@ right permissions:
 4. Add the ``admin`` role
 
 **NOTE:** version ``v12.0.2`` has its own tab
-``Service Account Roles`` where the ``admin`` role must be given
+``Service Account Roles`` where the ``admin`` role must be
 added.
 
 
 TODO
 ----
+
+* why do I use the master admin? Can't I use the realm ``admin-cli``
+  instead? I only do administration on realm level and this could
+  increase security and would pave the way for a single ``keycloak``
+  cluster with a single ``proxy`` application serving multiple
+  independent realms
 
 * verbose treatment of how to properly set up the environment for
   testing
