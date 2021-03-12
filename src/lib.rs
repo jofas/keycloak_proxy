@@ -1,7 +1,7 @@
 #![feature(try_trait)]
 
 use actix_web::client::{Client, PayloadError, SendRequestError};
-use actix_web::dev::{HttpResponseBuilder, Service};
+use actix_web::dev::HttpResponseBuilder;
 use actix_web::http::StatusCode;
 use actix_web::{
   delete, get, post, put, web, HttpRequest, HttpResponse,
