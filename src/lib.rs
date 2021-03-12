@@ -39,24 +39,6 @@ pub struct KeycloakProxyApp {
   su: SuperUser,
 }
 
-#[derive(Debug)]
-pub enum InitError {
-  VarError,
-  KeyStoreInitError,
-}
-
-impl From<VarError> for InitError {
-  fn from(_: VarError) -> Self {
-    Self::VarError
-  }
-}
-
-impl From<JwtError> for InitError {
-  fn from(_: JwtError) -> Self {
-    Self::KeyStoreInitError
-  }
-}
-
 impl KeycloakProxyApp {
   pub async fn init() -> Result<Self, InitError> {
     let client_id =
@@ -467,5 +449,23 @@ impl actix_web::error::ResponseError for Error {
         .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
       _ => StatusCode::INTERNAL_SERVER_ERROR,
     }
+  }
+}
+
+#[derive(Debug)]
+pub enum InitError {
+  VarError,
+  KeyStoreInitError,
+}
+
+impl From<VarError> for InitError {
+  fn from(_: VarError) -> Self {
+    Self::VarError
+  }
+}
+
+impl From<JwtError> for InitError {
+  fn from(_: JwtError) -> Self {
+    Self::KeyStoreInitError
   }
 }
