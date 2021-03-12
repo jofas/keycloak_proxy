@@ -5,4 +5,4 @@ RUN cargo build --release
 
 FROM opensuse/leap:latest
 COPY --from=build ./target/release/keycloak_proxy ./
-CMD ./keycloak_proxy
+CMD RUST_LOG=info ./keycloak_proxy

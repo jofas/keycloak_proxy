@@ -1044,10 +1044,12 @@ checksum = "dd25036021b0de88a0aff6b850051563c6516d0bf53f8638938edbb9de732736"
 [[package]]
 name = "jonases-tracing-util"
 version = "0.1.0"
-source = "git+https://github.com/jofas/jonases_tracing_util#7b0a67f6b26d4deecfdd7f10b3240a3c92d778db"
+source = "git+https://github.com/jofas/jonases_tracing_util#4798c6073459b1842b7d72668450b369b2340503"
 dependencies = [
+ "actix-web",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -1579,14 +1581,13 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.4.3"
+version = "1.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d9251239e129e16308e70d853559389de218ac275b515068abc96829d05b948a"
+checksum = "54fd1046a3107eb58f42de31d656fee6853e5d276c455fd943742dce89fc3dd3"
 dependencies = [
  "aho-corasick",
  "memchr",
  "regex-syntax",
- "thread_local",
 ]
 
 [[package]]
@@ -1601,9 +1602,9 @@ dependencies = [
 
 [[package]]
 name = "regex-syntax"
-version = "0.6.22"
+version = "0.6.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5eb417147ba9860a96cfe72a0b93bf88fee1744b5636ec99ab20c1aa9376581"
+checksum = "24d5f089152e60f62d28b835fbff2cd2e8dc0baf1ac13343bef92ab7eed84548"
 
 [[package]]
 name = "remove_dir_all"
@@ -2113,9 +2114,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.13"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a8a9bd1db7706f2373a190b0d067146caa39350c486f3d455b0e33b431f94c07"
+checksum = "41768be5b9f3489491825f56f01f25290aa1d3e7cc97e182d4d34360493ba6fa"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2290,6 +2291,16 @@ dependencies = [
  "idna",
  "matches",
  "percent-encoding",
+]
+
+[[package]]
+name = "uuid"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
+dependencies = [
+ "getrandom 0.2.2",
+ "serde",
 ]
 
 [[package]]

@@ -1,7 +1,7 @@
 #![feature(try_trait)]
 
 use actix_web::client::{Client, PayloadError, SendRequestError};
-use actix_web::dev::HttpResponseBuilder;
+use actix_web::dev::{HttpResponseBuilder, Service};
 use actix_web::http::StatusCode;
 use actix_web::{
   delete, get, post, put, web, HttpRequest, HttpResponse,
@@ -23,7 +23,9 @@ use display_json::DisplayAsJson;
 use derive_new::new;
 
 use jonases_tracing_util::tracing::{event, Level};
-use jonases_tracing_util::{log_simple_err_callback, logged_var};
+use jonases_tracing_util::{
+  log_simple_err_callback, logged_var, scoped_logger,
+};
 
 use std::env::VarError;
 use std::fmt;
@@ -75,6 +77,13 @@ impl KeycloakProxyApp {
       .service(delete_user)
       .service(set_password);
 
+    let log_scope = web::scope("/")
+      .service(certs)
+      .service(token)
+      .service(register)
+      .service(needs_auth_scope)
+      .wrap_fn(scoped_logger!());
+
     cfg
       .data(self.admin_token)
       .data(self.key_set)
@@ -82,10 +91,7 @@ impl KeycloakProxyApp {
       .data(self.client_id)
       .data(self.su)
       .data(Client::builder().disable_timeout().finish())
-      .service(certs)
-      .service(token)
-      .service(register)
-      .service(needs_auth_scope);
+      .service(log_scope);
   }
 
   async fn init_admin_token() -> Result<AccessToken, VarError> {
