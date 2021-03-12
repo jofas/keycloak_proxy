@@ -59,6 +59,9 @@ right permissions:
 
 4. Add the ``admin`` role
 
+**NOTE:** version ``v12.0.2`` has its own tab
+``Service Account Roles`` where the ``admin`` role must be given
+added.
 
 TODO
 ----
