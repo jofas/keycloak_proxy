@@ -67,6 +67,8 @@ added.
 TODO
 ----
 
+* enable client credentials requests
+
 * why do I use the master admin? Can't I use the realm ``admin-cli``
   instead? I only do administration on realm level and this could
   increase security and would pave the way for a single ``keycloak``

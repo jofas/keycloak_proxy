@@ -229,6 +229,7 @@ impl Credentials {
   }
 }
 
+// TODO: rename
 #[derive(Serialize, Deserialize, Debug, new)]
 pub struct ProxyRegisterRequest {
   first_name: String,
