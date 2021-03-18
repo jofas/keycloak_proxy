@@ -151,6 +151,7 @@ async fn register_user(
     "Test".to_owned(),
     username.to_owned(),
     email.to_owned(),
+    true,
     password.map(|x| x.to_owned()),
   );
 

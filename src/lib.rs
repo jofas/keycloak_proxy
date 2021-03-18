@@ -200,7 +200,7 @@ impl From<ProxyRegisterRequest> for User {
         proxy.first_name,
         proxy.last_name,
         proxy.email,
-        true,
+        proxy.enabled,
         proxy.username,
         vec![Credentials::password(password)],
       )
@@ -236,6 +236,7 @@ pub struct ProxyRegisterRequest {
   last_name: String,
   username: String,
   email: String,
+  enabled: bool,
   password: Option<String>,
 }
 
