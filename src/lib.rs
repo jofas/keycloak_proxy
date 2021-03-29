@@ -75,7 +75,8 @@ impl KeycloakProxyApp {
     let needs_auth_scope = web::scope("/")
       .wrap(jwt_validator())
       .service(delete_user)
-      .service(set_password);
+      .service(set_password)
+      .service(update_user_enabled);
 
     let log_scope = web::scope("/")
       .service(certs)
@@ -209,7 +210,7 @@ impl From<ProxyRegisterRequest> for User {
         proxy.first_name,
         proxy.last_name,
         proxy.email,
-        false,
+        proxy.enabled,
         proxy.username,
         vec![],
       )
@@ -287,6 +288,47 @@ async fn register(
     .into_wrapped_http_response()
 }
 
+#[put("/user/{username}/enabled")]
+async fn update_user_enabled(
+  web::Path((username,)): web::Path<(String,)>,
+  client: web::Data<Client>,
+  admin_token: web::Data<AccessToken>,
+  endpoints: web::Data<KeycloakEndpoints>,
+  su: web::Data<SuperUser>,
+  jwt_user: JwtUser,
+  enabled: String,
+) -> Result<HttpResponse, Error> {
+  has_access(&username, &jwt_user, &su.into_inner())?;
+
+  let enabled = match enabled.as_str() {
+    "true" => true,
+    "false" => false,
+    _ => return Ok(HttpResponse::BadRequest().finish()),
+  };
+
+  let mut user = get_user_by_username(
+    &username,
+    &endpoints,
+    &client,
+    &admin_token,
+  )
+  .await?;
+
+  event!(Level::INFO, %user);
+
+  user.enabled = enabled;
+
+  client
+    .put(&endpoints.user(&user.id.as_ref()?))
+    .header("authorization", admin_token.bearer().await?)
+    .send_json(&user)
+    .await
+    .map_err(log_simple_err_callback(
+      "could not update user password",
+    ))?
+    .into_wrapped_http_response()
+}
+
 #[put("/user/{username}/password")]
 async fn set_password(
   web::Path((username,)): web::Path<(String,)>,
@@ -309,7 +351,6 @@ async fn set_password(
 
   event!(Level::INFO, %user);
 
-  user.enabled = true;
   user.credentials = vec![Credentials::password(password)];
 
   client
