@@ -76,7 +76,7 @@ impl KeycloakProxyApp {
       .wrap(jwt_validator())
       .service(delete_user)
       .service(set_password)
-      .service(update_user_enabled);
+      .service(update_user);
 
     let log_scope = web::scope("/")
       .service(certs)
@@ -241,6 +241,21 @@ pub struct ProxyRegisterRequest {
   password: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug, new)]
+#[serde(rename_all(serialize = "camelCase"))]
+pub struct UserUpdateRequest {
+  #[serde(skip_serializing_if = "Option::is_none")]
+  first_name: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  last_name: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  username: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  email: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  enabled: Option<bool>,
+}
+
 #[post("/token")]
 async fn token(
   request: HttpRequest,
@@ -288,25 +303,19 @@ async fn register(
     .into_wrapped_http_response()
 }
 
-#[put("/user/{username}/enabled")]
-async fn update_user_enabled(
+#[put("/user/{username}")]
+async fn update_user(
   web::Path((username,)): web::Path<(String,)>,
   client: web::Data<Client>,
   admin_token: web::Data<AccessToken>,
   endpoints: web::Data<KeycloakEndpoints>,
   su: web::Data<SuperUser>,
   jwt_user: JwtUser,
-  enabled: String,
+  body: web::Json<UserUpdateRequest>,
 ) -> Result<HttpResponse, Error> {
   has_access(&username, &jwt_user, &su.into_inner())?;
 
-  let enabled = match enabled.as_str() {
-    "true" => true,
-    "false" => false,
-    _ => return Ok(HttpResponse::BadRequest().finish()),
-  };
-
-  let mut user = get_user_by_username(
+  let user = get_user_by_username(
     &username,
     &endpoints,
     &client,
@@ -316,15 +325,13 @@ async fn update_user_enabled(
 
   event!(Level::INFO, %user);
 
-  user.enabled = enabled;
-
   client
     .put(&endpoints.user(&user.id.as_ref()?))
     .header("authorization", admin_token.bearer().await?)
-    .send_json(&user)
+    .send_json(&body.into_inner())
     .await
     .map_err(log_simple_err_callback(
-      "could not update user password",
+      "could not update user",
     ))?
     .into_wrapped_http_response()
 }

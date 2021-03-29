@@ -7,7 +7,7 @@ use futures::stream::TryStreamExt;
 
 use jonases_tracing_util::logged_var;
 
-use keycloak_proxy::{KeycloakProxyApp, ProxyRegisterRequest};
+use keycloak_proxy::{KeycloakProxyApp, ProxyRegisterRequest, UserUpdateRequest};
 
 #[actix_rt::test]
 async fn password_request() {
@@ -145,8 +145,12 @@ async fn update_user_enabled() {
 
   let tkn = token("testuser5", "pw").await;
 
+  let user_update = UserUpdateRequest::new(
+    None, None, None, None, Some(false)
+  );
+
   assert_eq!(
-    update_enabled("testuser5", false, tkn.clone())
+    update_user("testuser5", user_update, tkn.clone())
       .await
       .as_u16(),
     204
@@ -154,8 +158,12 @@ async fn update_user_enabled() {
 
   failed_token("testuser5", "pw").await;
 
+  let user_update = UserUpdateRequest::new(
+    None, None, None, None, Some(true)
+  );
+
   assert_eq!(
-    update_enabled("testuser5", true, tkn).await.as_u16(),
+    update_user("testuser5", user_update, tkn).await.as_u16(),
     204
   );
 
@@ -230,9 +238,9 @@ async fn update_password(
   resp.status()
 }
 
-async fn update_enabled(
+async fn update_user(
   username: &str,
-  enabled: bool,
+  user_update: UserUpdateRequest,
   token: String,
 ) -> StatusCode {
   let app = KeycloakProxyApp::init().await.unwrap();
@@ -241,9 +249,9 @@ async fn update_enabled(
     test::init_service(App::new().configure(app.config())).await;
 
   let req = test::TestRequest::put()
-    .uri(&format!("/user/{}/enabled", username))
+    .uri(&format!("/user/{}", username))
     .header("authorization", token)
-    .set_payload(enabled.to_string())
+    .set_json(&user_update)
     .to_request();
 
   let resp = test::call_service(&mut app, req).await;
