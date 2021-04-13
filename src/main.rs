@@ -33,6 +33,7 @@ async fn main() -> std::io::Result<()> {
     */
   })
   .bind(&addr)?
+  .client_timeout(0)
   .run()
   .await
 }
